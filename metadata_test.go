@@ -429,3 +429,20 @@ func TestParseMetadata_JSON_InvalidJSON_EmptyMetadata(t *testing.T) {
 		t.Errorf("expected empty Metadata for invalid JSON, got Name=%q", m.Name)
 	}
 }
+
+func TestParseMetadata_YAML_FlowList_UnquotesElements(t *testing.T) {
+	fm := "---\nname: x\ntags: ['foo bar', \"baz\", qux]\n---\nbody"
+	m := ParseMetadata(fm)
+	want := []string{"foo bar", "baz", "qux"}
+	if len(m.Tags) != 3 || m.Tags[0] != want[0] || m.Tags[1] != want[1] || m.Tags[2] != want[2] {
+		t.Errorf("expected %v, got %v", want, m.Tags)
+	}
+}
+
+func TestParseMetadata_YAML_AllowedToolsFlowList_UnquotesElements(t *testing.T) {
+	fm := "---\nname: x\nallowed-tools: [\"Read\", 'Grep', Bash]\n---\nbody"
+	m := ParseMetadata(fm)
+	if len(m.AllowedTools) != 3 || m.AllowedTools[0] != "Read" || m.AllowedTools[1] != "Grep" || m.AllowedTools[2] != "Bash" {
+		t.Errorf("expected [Read Grep Bash], got %v", m.AllowedTools)
+	}
+}

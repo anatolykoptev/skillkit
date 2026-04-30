@@ -57,15 +57,14 @@ func TestStripFrontmatter_JSON_HappyPath(t *testing.T) {
 }
 
 func TestStripFrontmatter_JSON_InvalidJSON_Unchanged(t *testing.T) {
+	// After M1 fix: invalid JSON fails json.Decoder.Decode, frontmatter
+	// detection returns ("", original), StripFrontmatter returns input
+	// unchanged.
 	input := "{invalid json}\n\nsome body"
 	got := StripFrontmatter(input)
-	// Invalid JSON (unbalanced braces that complete but content is not valid)
-	// ParseFrontmatter still strips the "frontmatter" and returns body —
-	// the unchanged contract applies when brace depth logic fails.
-	// In practice "{invalid json}" parses structurally (braces balance) so
-	// the body is returned; ParseMetadata will fail gracefully.
-	// The "unchanged" guarantee is for unrecognized fences only.
-	_ = got // just ensure no panic
+	if got != input {
+		t.Errorf("expected unchanged on invalid JSON, got %q", got)
+	}
 }
 
 func TestStripFrontmatter_JSON_NoBlankSeparator_Unchanged(t *testing.T) {
@@ -128,6 +127,25 @@ func TestStripFrontmatter_LeadingWhitespace_Stripped(t *testing.T) {
 	got := StripFrontmatter(input)
 	if got != "Indented body." {
 		t.Errorf("expected leading spaces+tabs stripped, got %q", got)
+	}
+}
+
+func TestStripFrontmatter_JSON_BracesInsideStrings(t *testing.T) {
+	// Spec divergence fixed (M1): JSON string values containing literal
+	// { or } must not confuse the frontmatter detector.
+	input := `{"name":"foo","msg":"has } inside"}` + "\n\nBody after."
+	got := StripFrontmatter(input)
+	if got != "Body after." {
+		t.Errorf("expected body, got %q", got)
+	}
+}
+
+func TestStripFrontmatter_JSON_TrailingGarbage_Unchanged(t *testing.T) {
+	// {...}trailing — invalid frontmatter, must be returned unchanged.
+	input := `{"name":"foo"}trailing` + "\n\nBody."
+	got := StripFrontmatter(input)
+	if got != input {
+		t.Errorf("expected unchanged on trailing garbage, got %q", got)
 	}
 }
 

@@ -268,7 +268,9 @@ func parseBoolYAML(s string) bool {
 }
 
 // parseToolList parses allowed-tools: either a YAML flow list [A, B]
-// or a space-separated string.
+// or a space-separated string. Note: quoted multi-word tool names
+// (e.g. "Bash with space") are not supported in space-separated form;
+// use the flow list syntax ([Read, "Bash with space"]) instead.
 func parseToolList(val string) []string {
 	if strings.HasPrefix(val, "[") {
 		return parseFlowList(val)
@@ -278,7 +280,11 @@ func parseToolList(val string) []string {
 	if len(parts) == 0 {
 		return nil
 	}
-	return parts
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		result = append(result, unquoteYAML(p))
+	}
+	return result
 }
 
 // parseTagList parses tags: either a YAML flow list [a, b] or a
@@ -294,7 +300,7 @@ func parseTagList(val string) []string {
 		if i >= maxTagsComma {
 			break
 		}
-		t := strings.TrimSpace(part)
+		t := unquoteYAML(strings.TrimSpace(part))
 		if t != "" {
 			result = append(result, t)
 		}
@@ -306,16 +312,20 @@ func parseTagList(val string) []string {
 }
 
 // parseFlowList parses a YAML flow sequence: [item1, item2, ...].
+// Quotes around individual elements are stripped via unquoteYAML.
 func parseFlowList(val string) []string {
 	val = strings.TrimSpace(val)
 	if !strings.HasPrefix(val, "[") || !strings.HasSuffix(val, "]") {
 		return nil
 	}
 	inner := val[1 : len(val)-1]
+	if inner == "" {
+		return nil
+	}
 	parts := strings.Split(inner, ",")
 	result := make([]string, 0, len(parts))
 	for _, p := range parts {
-		t := strings.TrimSpace(p)
+		t := unquoteYAML(strings.TrimSpace(p))
 		if t != "" {
 			result = append(result, t)
 		}

@@ -2,6 +2,7 @@ package skill
 
 import (
 	"bufio"
+	"encoding/json"
 	"strings"
 	"unicode/utf8"
 )
@@ -73,55 +74,46 @@ func parseYAMLFrontmatter(content string) (frontmatter, body string) {
 }
 
 // parseJSONFrontmatter handles "{...}\n\nbody" format.
+//
+// Uses json.Decoder + InputOffset so that literal { or } inside JSON
+// string values do not confuse the detector. Trailing non-whitespace
+// on the same line as the closing brace (e.g. `{"k":"v"}garbage`)
+// causes ("", original) to be returned.
 func parseJSONFrontmatter(content string) (frontmatter, body string) {
-	scanner := bufio.NewScanner(strings.NewReader(content))
-	scanner.Buffer(make([]byte, scannerBufSize), scannerBufSize)
-
-	jsonLines, ok := scanJSONBlock(scanner)
-	if !ok {
+	dec := json.NewDecoder(strings.NewReader(content))
+	var raw json.RawMessage
+	if err := dec.Decode(&raw); err != nil {
 		return "", content
 	}
-	fm := strings.Join(jsonLines, "\n")
+	end := int(dec.InputOffset())
+	fm := strings.TrimSpace(string(raw))
 
-	// Next line must be blank separator.
-	if !scanner.Scan() {
+	rest := content[end:]
+	// Anything between end and the first newline must be only whitespace.
+	nl := strings.IndexByte(rest, '\n')
+	if nl < 0 {
+		return "", content
+	}
+	if strings.TrimSpace(rest[:nl]) != "" {
+		return "", content
+	}
+	rest = rest[nl+1:]
+
+	// Next line must be blank (the separator).
+	nl2 := strings.IndexByte(rest, '\n')
+	if nl2 < 0 {
+		// No trailing newline: rest is the separator line itself.
+		// It must be blank; if so, body is empty. If not, fail.
+		if strings.TrimSpace(rest) != "" {
+			return "", content
+		}
 		return fm, ""
 	}
-	if scanner.Text() != "" {
+	if strings.TrimSpace(rest[:nl2]) != "" {
 		return "", content
 	}
-
-	return fm, collectBody(scanner)
-}
-
-// scanJSONBlock reads lines until brace depth returns to zero.
-// Returns (lines, true) on success, (nil, false) when depth never balances.
-func scanJSONBlock(scanner *bufio.Scanner) ([]string, bool) {
-	var lines []string
-	depth := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		lines = append(lines, line)
-		depth += braceDepthDelta(line)
-		if depth == 0 {
-			return lines, true
-		}
-	}
-	return nil, false
-}
-
-// braceDepthDelta counts net '{' minus '}' in a line.
-func braceDepthDelta(line string) int {
-	delta := 0
-	for _, ch := range line {
-		switch ch {
-		case '{':
-			delta++
-		case '}':
-			delta--
-		}
-	}
-	return delta
+	body = stripNUL(strings.TrimLeft(rest[nl2+1:], " \t\n"))
+	return fm, body
 }
 
 // collectBody drains scanner lines into a NUL-free body string with
