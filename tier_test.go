@@ -573,6 +573,40 @@ func TestContextResolver_InterfaceSatisfied(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// PluginTier Dir contract tests (Item 15)
+// ---------------------------------------------------------------------------
+
+func TestPluginTier_BodyOnly_DirIsEmpty(t *testing.T) {
+	body := "---\nname: foo\n---\nbody"
+	tier := skillkit.NewPluginTier("plugins", []skillkit.PluginEntry{{
+		PluginName: "p", SkillName: "foo", Body: body,
+	}})
+	info, _, ok := tier.Resolver.Find("foo")
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if info.Dir != "" {
+		t.Errorf("expected Dir empty for body-only entry, got %q", info.Dir)
+	}
+}
+
+func TestPluginTier_BodyAndPath_DirFromPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "skill.md")
+	body := "---\nname: foo\n---\nbody"
+	tier := skillkit.NewPluginTier("plugins", []skillkit.PluginEntry{{
+		PluginName: "p", SkillName: "foo", Body: body, Path: path,
+	}})
+	info, _, ok := tier.Resolver.Find("foo")
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if info.Dir != dir {
+		t.Errorf("expected Dir=%q, got %q", dir, info.Dir)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 
