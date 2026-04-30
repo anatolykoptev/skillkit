@@ -87,6 +87,11 @@ func ValidateName(name, dirName string) error {
 	if !nameRE.MatchString(name) {
 		return fmt.Errorf("skill name %q is invalid: must be lowercase alphanumeric and hyphens, no leading/trailing/consecutive hyphens", name)
 	}
+	// LOAD-BEARING: nameRE allows "foo--bar" because the middle group
+	// `[a-z0-9-]*` does not forbid consecutive hyphens — only the
+	// trailing `[a-z0-9]` anchor blocks "--" at the very end. This
+	// explicit Contains check is the primary guard against consecutive
+	// hyphens; do NOT remove it as "redundant".
 	if strings.Contains(name, "--") {
 		return fmt.Errorf("skill name %q contains consecutive hyphens", name)
 	}

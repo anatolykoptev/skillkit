@@ -121,6 +121,16 @@ func TestStripFrontmatter_NULBytes_Removed(t *testing.T) {
 	}
 }
 
+func TestStripFrontmatter_LeadingWhitespace_Stripped(t *testing.T) {
+	// Body with leading spaces and tabs (in addition to newlines) must be
+	// trimmed per the documented contract: "leading whitespace".
+	input := "---\nname: foo\n---\n\n  \t  Indented body."
+	got := StripFrontmatter(input)
+	if got != "Indented body." {
+		t.Errorf("expected leading spaces+tabs stripped, got %q", got)
+	}
+}
+
 func BenchmarkStripFrontmatter_NoFence(b *testing.B) {
 	input := "Just plain text without any frontmatter fence.\nLine two.\nLine three."
 	b.ReportAllocs()

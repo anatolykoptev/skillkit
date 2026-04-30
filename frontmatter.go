@@ -9,12 +9,17 @@ import (
 const scannerBufSize = 1 << 20 // 1 MiB — prevents silent truncation of large skills
 
 // StripFrontmatter removes a leading YAML or JSON frontmatter block
-// and returns the body trimmed of leading whitespace. Input without
-// a recognized fence is returned unchanged. Supports YAML ("---" fences)
-// and JSON (top-level object on first line, blank line, body).
+// and returns the body trimmed of leading whitespace (spaces, tabs,
+// and newlines). Input without a recognized fence is returned
+// unchanged. Supports YAML ("---" fences) and JSON (top-level object
+// on first line, blank line, body).
 //
-// CRLF input is normalized to LF before parsing. NUL bytes inside the
-// body are silently stripped (bufio.Scanner stops at NUL otherwise).
+// CRLF input is normalized to LF before parsing. The "unchanged"
+// guarantee covers byte-identical input only for content that does NOT
+// start with '-' or '{'; once a fence is detected and parsing fails
+// (e.g. "---\r\n" with no closing fence), the returned string is the
+// CRLF-normalized form. NUL bytes inside the body are silently
+// stripped (bufio.Scanner stops at NUL otherwise).
 func StripFrontmatter(content string) string {
 	_, body := ParseFrontmatter(content)
 	return body
@@ -119,13 +124,14 @@ func braceDepthDelta(line string) int {
 	return delta
 }
 
-// collectBody drains scanner lines into a trimmed, NUL-free body string.
+// collectBody drains scanner lines into a NUL-free body string with
+// leading whitespace (spaces, tabs, newlines) stripped per the spec.
 func collectBody(scanner *bufio.Scanner) string {
 	var bodyLines []string
 	for scanner.Scan() {
 		bodyLines = append(bodyLines, scanner.Text())
 	}
-	return stripNUL(strings.TrimLeft(strings.Join(bodyLines, "\n"), "\n"))
+	return stripNUL(strings.TrimLeft(strings.Join(bodyLines, "\n"), " \t\n"))
 }
 
 // stripNUL removes NUL bytes from s. bufio.Scanner stops at NUL,
