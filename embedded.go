@@ -74,7 +74,12 @@ func NewEmbedded(name, envVar, embeddedRaw string) *Embedded {
 // Body returns the resolved skill body. Resolution order:
 //  1. If envVar is set, the file at that path is ≤1 MiB, readable, and
 //     non-empty after frontmatter strip — returns mtime-cached body.
-//  2. Otherwise returns the embedded default.
+//  2. If env path becomes transiently unreadable (e.g. atomic-rename
+//     window where the writer renames a .tmp over the target), but a
+//     prior successful read populated the cache — returns the cached
+//     last-known-good body. Operator-friendly: a brief stat-fail does
+//     not blip the binary back to the embedded default.
+//  3. Otherwise returns the embedded default.
 //
 // I/O errors are logged via slog.Debug and never returned. Body() is
 // best-effort — a service must never break on a hot-reload typo.
@@ -95,7 +100,7 @@ func (e *Embedded) Body() string {
 func (e *Embedded) resolveEnvBody(path string) string {
 	info, err := os.Stat(path) //nolint:gosec // G703: path from operator env; intentional
 	if err != nil {
-		slog.Debug("skillkit.Embedded: stat failed", "path", path, "err", err) //nolint:gosec // G706: path is operator-controlled; not user input
+		slog.Debug("skillkit.Embedded: stat failed", "name", e.name, "path", path, "err", err) //nolint:gosec // G706: path is operator-controlled; not user input
 		// Return last-known-good cache if available, else embedded default.
 		if e.cachedBody != "" {
 			return e.cachedBody
@@ -104,7 +109,7 @@ func (e *Embedded) resolveEnvBody(path string) string {
 	}
 
 	if info.Size() > maxEnvOverrideSize {
-		slog.Debug("skillkit.Embedded: file too large", "path", path, "size", info.Size()) //nolint:gosec // G706: path is operator-controlled; not user input
+		slog.Debug("skillkit.Embedded: file too large", "name", e.name, "path", path, "size", info.Size()) //nolint:gosec // G706: path is operator-controlled; not user input
 		return e.body
 	}
 
@@ -115,13 +120,13 @@ func (e *Embedded) resolveEnvBody(path string) string {
 
 	raw, err := os.ReadFile(path) //nolint:gosec // G304,G703: path from operator env; intentional
 	if err != nil {
-		slog.Debug("skillkit.Embedded: read failed", "path", path, "err", err) //nolint:gosec // G706: path is operator-controlled; not user input
+		slog.Debug("skillkit.Embedded: read failed", "name", e.name, "path", path, "err", err) //nolint:gosec // G706: path is operator-controlled; not user input
 		return e.body
 	}
 
 	stripped := StripFrontmatter(string(raw))
 	if stripped == "" {
-		slog.Debug("skillkit.Embedded: env file has empty body after strip", "path", path) //nolint:gosec // G706: path is operator-controlled; not user input
+		slog.Debug("skillkit.Embedded: env file has empty body after strip", "name", e.name, "path", path) //nolint:gosec // G706: path is operator-controlled; not user input
 		return e.body
 	}
 
