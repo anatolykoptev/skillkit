@@ -2,6 +2,8 @@ package skillkit
 
 import (
 	"encoding/json"
+	"encoding/xml"
+	"log/slog"
 	"strings"
 )
 
@@ -62,7 +64,7 @@ func buildXML(skills []SkillInfo) string {
 
 	for i := range skills {
 		si := skills[i]
-		if strings.Contains(si.Source, ":") {
+		if isPluginSource(si.Source) {
 			// Source format: "<tier>:<plugin>"
 			plugin := si.Source[strings.Index(si.Source, ":")+1:]
 			if _, exists := pluginMap[plugin]; !exists {
@@ -133,17 +135,19 @@ func buildMarkdown(skills []SkillInfo) string {
 func buildJSON(skills []SkillInfo) string {
 	data, err := json.Marshal(skills)
 	if err != nil {
+		slog.Warn("skillkit.BuildSummary: JSON marshal failed", "err", err, "count", len(skills))
 		return "[]"
 	}
 	return string(data)
 }
 
-// xmlEscape replaces &, <, > with XML entities.
+// xmlEscape escapes a string for safe inclusion in XML text or attribute
+// content. Uses encoding/xml.EscapeText for full coverage (& < > " ' plus
+// whitespace control characters).
 func xmlEscape(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	return s
+	var b strings.Builder
+	_ = xml.EscapeText(&b, []byte(s))
+	return b.String()
 }
 
 // truncate returns s truncated to n characters (rune-counted).

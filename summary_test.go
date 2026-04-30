@@ -217,6 +217,27 @@ func TestBuildSummary_JSON_FullDescription(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// BuildSummary XML escape: quotes in attributes (M1 regression)
+// ---------------------------------------------------------------------------
+
+func TestBuildSummary_XML_EscapesQuotesInAttributes(t *testing.T) {
+	// M1 fix: operator-controlled values (path, plugin name) containing
+	// " must not break XML attribute syntax.
+	cat := skillkit.NewCatalog(skillkit.NewPluginTier("plugins", []skillkit.PluginEntry{{
+		PluginName: `weird"plugin`,
+		SkillName:  "foo",
+		Body:       "---\nname: foo\ndescription: A skill with \"quotes\" in it.\n---\nbody",
+	}}))
+	out := cat.BuildSummary(skillkit.SummaryXML)
+	if strings.Contains(out, `plugin="weird"plugin"`) {
+		t.Error("XML attribute injection: unescaped quote in plugin name")
+	}
+	if !strings.Contains(out, "&#34;") && !strings.Contains(out, "&quot;") {
+		t.Error("expected escaped quote (either &#34; or &quot;), got neither")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // BuildSummary empty Catalog
 // ---------------------------------------------------------------------------
 

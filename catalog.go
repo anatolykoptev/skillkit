@@ -78,27 +78,15 @@ func (c *Catalog) LoadCtx(ctx context.Context, name string) (body string, info S
 	return "", SkillInfo{}, false, nil
 }
 
-// LoadMany returns a concatenated system-prompt block for the given names.
-// Each skill is rendered as "### Skill: <name>\n\n<body>\n\n---\n\n".
-// The trailing separator is stripped. Missing skills are logged at Debug
-// and silently skipped. Returns "" for an empty names slice.
+// LoadMany concatenates skill bodies for system-prompt injection.
+// Format per skill: "### Skill: <name>\n\n<body>". Skills joined with
+// "\n\n---\n\n". Missing skills logged at slog.Debug and skipped.
+// Returns "" when no skills resolve.
+//
+// LoadMany is a context-less convenience wrapper around LoadManyCtx
+// using context.Background(); they share the format contract.
 func (c *Catalog) LoadMany(names []string) string {
-	if len(names) == 0 {
-		return ""
-	}
-	var parts []string
-	for _, name := range names {
-		body, _, ok := c.Load(name)
-		if !ok {
-			slog.Debug("skillkit.Catalog.LoadMany: skill not found, skipping", "name", name)
-			continue
-		}
-		parts = append(parts, "### Skill: "+name+"\n\n"+body)
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, "\n\n---\n\n")
+	return c.LoadManyCtx(context.Background(), names)
 }
 
 // LoadManyCtx is the context-aware variant of LoadMany.
@@ -126,11 +114,25 @@ func (c *Catalog) LoadManyCtx(ctx context.Context, names []string) string {
 	return strings.Join(parts, "\n\n---\n\n")
 }
 
+// isPluginSource reports whether info.Source uses the PluginTier
+// "<tier>:<plugin>" namespacing format. Catalog.tagSource skips the
+// override when this returns true; summary.go uses it to group
+// XML output under <skill-group plugin="...">.
+//
+// The check is intentionally lenient (presence of a colon) — it matches
+// any future Resolver that adopts the same namespacing convention.
+// Stricter validation would couple this helper to the PluginTier
+// implementation and break the open-extension goal of the Resolver
+// interface.
+func isPluginSource(source string) bool {
+	return strings.Contains(source, ":")
+}
+
 // tagSource sets info.Source = tier.Name for non-plugin resolvers.
 // PluginTier already populates Source as "<tier>:<plugin>" (detected
 // by the presence of ":"), so those are returned unchanged.
 func (c *Catalog) tagSource(t Tier, info SkillInfo) SkillInfo {
-	if strings.Contains(info.Source, ":") {
+	if isPluginSource(info.Source) {
 		// PluginTier already set source.
 		return info
 	}
