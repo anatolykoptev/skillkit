@@ -1,3 +1,3 @@
-module github.com/anatolykoptev/agentskills-go
+module github.com/anatolykoptev/skillkit
 
 go 1.26

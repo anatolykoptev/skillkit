@@ -1,4 +1,4 @@
-package skill
+package skillkit
 
 import (
 	"bufio"
@@ -38,7 +38,7 @@ type Metadata struct {
 	DisableModelInvocation bool
 	UserInvocable          *bool // nil = default (true)
 
-	// agentskills-go custom (widely useful, not in spec)
+	// skillkit custom (widely useful, not in spec)
 	Version string
 	Locale  string
 	Tags    []string
