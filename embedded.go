@@ -232,10 +232,15 @@ func (e *Embedded) BodyCtx(ctx context.Context) string {
 	if e.tracer == nil || e.tracer.StartBody == nil {
 		return e.Body()
 	}
+	// Deferred end-fn so a panicking observer hook in fireBodyCall still
+	// closes the span. Mirrors Catalog.LoadCtx (catalog.go) — keep the
+	// two tracer call sites symmetric.
 	_, end := e.tracer.StartBody(ctx, e.name)
-	body, source := e.resolveBody()
+	var source string
+	defer func() { end(source) }()
+	body, src := e.resolveBody()
+	source = src
 	e.fireBodyCall(source, body)
-	end(source)
 	return body
 }
 
