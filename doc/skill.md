@@ -417,7 +417,113 @@ and will not change (see `docs/ROADMAP.md` anti-roadmap).
 
 ---
 
-## 11. Migration notes from hand-rolled loaders
+## 11. Observability
+
+Both `Embedded` and `Catalog` accept an optional `Observer` that fires
+stdlib callbacks for each runtime event. Wire the callbacks to whichever
+metrics backend the consuming service uses — skillkit core stays
+stdlib-only.
+
+### Wiring to prometheus\_client\_golang
+
+```go
+import (
+    "github.com/anatolykoptev/skillkit"
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+var (
+    skillBodyCalls = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "skill_body_calls_total",
+        Help: "Skill body resolutions by source path.",
+    }, []string{"name", "source"})
+
+    skillEnvFallbacks = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "skill_env_fallbacks_total",
+        Help: "Skill env-override rejections by reason.",
+    }, []string{"name", "reason"})
+
+    skillBodyBytes = promauto.NewHistogramVec(prometheus.HistogramOpts{
+        Name:    "skill_body_bytes",
+        Help:    "Byte size of bodies returned by Body()",
+        Buckets: prometheus.ExponentialBuckets(256, 4, 8),
+    }, []string{"name"})
+)
+
+var obs = &skillkit.Observer{
+    BodyCall:    func(name, source string) { skillBodyCalls.WithLabelValues(name, source).Inc() },
+    EnvFallback: func(name, reason string) { skillEnvFallbacks.WithLabelValues(name, reason).Inc() },
+    BodyBytes:   func(name string, b int) { skillBodyBytes.WithLabelValues(name).Observe(float64(b)) },
+}
+
+var skill = skillkit.NewEmbedded("d10-extractor", "MEMDB_D10_SKILL_PATH", rawSkill,
+    skillkit.WithObserver(obs))
+
+// For Catalog:
+var cat = skillkit.NewCatalog(
+    skillkit.NewDirTier("workspace", workspaceDir),
+    skillkit.NewDirTier("builtin", builtinDir),
+).WithObserver(&skillkit.Observer{
+    CatalogLoad: func(name, outcome string) { /* counter */ },
+    CatalogSize: func(tier string, count int) { /* gauge */ },
+})
+```
+
+### Wiring to OpenTelemetry
+
+```go
+import (
+    "go.opentelemetry.io/otel/metric"
+    "github.com/anatolykoptev/skillkit"
+)
+
+func newSkillObserver(meter metric.Meter) *skillkit.Observer {
+    calls, _ := meter.Int64Counter("skill.body.calls")
+    fallbacks, _ := meter.Int64Counter("skill.env.fallbacks")
+    return &skillkit.Observer{
+        BodyCall:    func(name, source string) {
+            calls.Add(ctx, 1,
+                metric.WithAttributes(attribute.String("name", name),
+                    attribute.String("source", source)))
+        },
+        EnvFallback: func(name, reason string) {
+            fallbacks.Add(ctx, 1,
+                metric.WithAttributes(attribute.String("name", name),
+                    attribute.String("reason", reason)))
+        },
+    }
+}
+```
+
+### Wiring to slog (local debug)
+
+```go
+var obs = &skillkit.Observer{
+    BodyCall:    func(name, source string) { slog.Debug("skill.body", "name", name, "source", source) },
+    EnvFallback: func(name, reason string) { slog.Warn("skill.env_fallback", "name", name, "reason", reason) },
+    BodyBytes:   func(name string, b int) { slog.Debug("skill.bytes", "name", name, "bytes", b) },
+    CatalogLoad: func(name, outcome string) { slog.Debug("skill.catalog", "name", name, "outcome", outcome) },
+    CatalogSize: func(tier string, n int) { slog.Info("skill.catalog_size", "tier", tier, "count", n) },
+}
+```
+
+### Label cardinality
+
+All labels have bounded cardinality:
+
+- `name` — one entry per skill instance (typically 1–50 per service)
+- `source` — fixed enum: `embedded`, `env`, `cache_hit`, `last_known_good`
+- `reason` — fixed enum: `unreadable`, `too_large`, `empty_body`
+- `outcome` — fixed enum: `hit`, `miss`
+- `tier` — one entry per Catalog tier (typically 2–5 per Catalog)
+
+None of these labels are user-controlled. Cardinality will not grow
+unbounded under adversarial input.
+
+---
+
+## 12. Migration notes from hand-rolled loaders
 
 Existing skill files (`SKILL.md` with YAML or JSON frontmatter) work
 unchanged — skillkit is spec-compliant and parses the same frontmatter
@@ -474,7 +580,7 @@ summary := cat.BuildSummary(skillkit.SummaryXML)
 
 ---
 
-## 12. Spec conformance table
+## 13. Spec conformance table
 
 | Spec field | Required? | skillkit slot |
 |---|---|---|

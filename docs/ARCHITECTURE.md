@@ -114,6 +114,43 @@ detects implementation via type assertion and prefers `FindCtx`
 when available. This keeps existing in-process callers untouched
 while leaving the door open for v0.3.0 network resolvers.
 
+### Observability
+
+Both patterns accept an optional `Observer` struct that fires nil-safe
+callbacks for runtime events. The Observer is attached after construction:
+
+- `Embedded`: `NewEmbedded(name, envVar, raw, WithObserver(obs))`
+- `Catalog`: `cat.WithObserver(obs)` (chained method)
+
+**Why nil-able func fields, not an interface?**
+
+Using a struct with optional `func` fields (vs. an interface with
+required methods) gives two properties:
+
+1. *Backward compatibility at the struct level.* Adding a new field in a
+   future minor release is non-breaking — callers' existing struct
+   literals compile unchanged with the new field as nil (= no-op). An
+   interface would require each implementor to add the new method.
+2. *Partial instrumentation.* A caller that only cares about cache-hit
+   rate sets `BodyCall` and leaves the rest nil. No boilerplate stubs.
+
+**Label cardinality.** All label values are constants, not user input:
+
+| Hook | Labels | Values |
+|------|--------|--------|
+| `BodyCall` | `source` | `embedded`, `env`, `cache_hit`, `last_known_good` |
+| `EnvFallback` | `reason` | `unreadable`, `too_large`, `empty_body` |
+| `CatalogLoad` | `outcome` | `hit`, `miss` |
+| `CatalogSize` | `tier` | one per tier (2–5 typical) |
+
+None of these labels are user-controlled; cardinality is bounded at
+service startup.
+
+**Stdlib-only guarantee.** skillkit core imports nothing beyond stdlib.
+The Observer callbacks are typed as plain `func` values; the caller
+owns all metric library imports. See `doc/skill.md § 11. Observability`
+for wiring examples (prometheus, OpenTelemetry, slog).
+
 ## Shared primitives
 
 ```
