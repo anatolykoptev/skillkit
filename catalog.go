@@ -60,8 +60,13 @@ func (c *Catalog) WithObserver(obs *Observer) *Catalog {
 // Locale matching is exact-string equality (case-insensitive). The most
 // common values are BCP-47 language tags ("en", "ru", "zh", "pt-BR")
 // but skillkit does not validate the format — caller decides the
-// vocabulary. Empty locale string disables filtering (returns receiver
-// unchanged).
+// vocabulary. Hyphen vs underscore normalization (e.g. "pt-BR" vs
+// "pt_BR") is also the caller's responsibility.
+//
+// Empty locale string is a no-op (returns the receiver unchanged); it
+// does NOT reset a previously configured locale. Per the "configure
+// once at startup" contract, callers wishing to disable filtering
+// after a prior WithLocale call should construct a new Catalog instead.
 //
 // Mutates and returns the receiver for chained construction:
 //

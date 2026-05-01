@@ -55,9 +55,9 @@ func findInTierByLocale(t Tier, name, locale string) (SkillInfo, string, bool) {
 	}
 
 	var (
-		exactLocale  *SkillInfo
+		exactLocale   *SkillInfo
 		neutralLocale *SkillInfo
-		anyMatch     *SkillInfo
+		anyMatch      *SkillInfo
 	)
 
 	t.Resolver.Walk(func(info SkillInfo) {
