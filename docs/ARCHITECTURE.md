@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the design of `agentskills-go` — what the
+This document describes the design of `skillkit` — what the
 package contains, why it is structured this way, and how the pieces
 fit together.
 
@@ -208,7 +208,7 @@ Claude Code extensions:
 | `user-invocable` | bool | `Metadata.UserInvocable *bool` |
 | `model`, `effort`, `context`, `argument-hint`, `arguments` | runtime hints | `Metadata.Extra` |
 
-agentskills-go custom fields (widely useful, not in spec):
+skillkit custom fields (widely useful, not in spec):
 
 | Field | Purpose |
 |-------|---------|
@@ -218,12 +218,12 @@ agentskills-go custom fields (widely useful, not in spec):
 
 ## Module layout choice
 
-Single root package (`package skill`). Reasons:
+Single root package (`package skillkit`). Reasons:
 
-- Consumers type `skill.NewEmbedded(...)` and `skill.Catalog{}` —
+- Consumers type `skillkit.NewEmbedded(...)` and `skillkit.Catalog{}` —
   short and ergonomic.
-- The `-go` suffix in the repo name is for ecosystem discovery on
-  agentskills.io; not part of the import alias.
+- Package name matches the directory + module name (Go convention),
+  so no import alias is needed.
 - A future MCP / Langfuse / HTTP resolver lives in its own
   sub-package (e.g. `mcpresolver/`) with its own go.mod so the core
   package stays stdlib-only.

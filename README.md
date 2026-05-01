@@ -1,24 +1,28 @@
-# agentskills-go
+# skillkit
 
-Go loader for the [Agent Skills open standard](https://agentskills.io)
-(`SKILL.md` + YAML frontmatter), compatible with the format adopted by
-Claude Code, Cursor, GitHub Copilot, VS Code, Gemini CLI, OpenAI Codex,
-JetBrains Junie, OpenHands, Goose, and 30+ other agentic tools.
+<!-- [![Go Reference](https://pkg.go.dev/badge/github.com/anatolykoptev/skillkit.svg)](https://pkg.go.dev/github.com/anatolykoptev/skillkit) -->
+<!-- [![CI](https://github.com/anatolykoptev/skillkit/actions/workflows/ci.yml/badge.svg)](https://github.com/anatolykoptev/skillkit/actions/workflows/ci.yml) -->
 
-> **Status:** in development. First reference Go implementation of the
-> agentskills.io standard. See `docs/plans/` for the implementation plan.
+> The reference Go toolkit for the [agentskills.io open standard](https://agentskills.io).
+> Parse `SKILL.md` files, validate names, discover skills from filesystem
+> or `embed.FS`, integrate with Claude Code, Cursor, GitHub Copilot,
+> JetBrains Junie, Gemini CLI, OpenAI Codex, and 35+ other agentic tools
+> without lock-in.
+
+> **Status:** pre-1.0, public API may change. v0.1.0 release pending final review.
+> See `docs/plans/` for the work plan.
 
 ## What it does
 
 Two independent APIs in one zero-dependency package:
 
-- **`skill.Embedded`** — single skill baked into a binary via `//go:embed`,
+- **`skillkit.Embedded`** — single skill baked into a binary via `//go:embed`,
   with optional env-path override for hot-reload during prompt iteration.
   Designed for services that ship one skill per binary (e.g. an answer
   extractor in a search pipeline).
 
-- **`skill.Catalog`** — multi-skill discovery across tiered sources
-  (filesystem directories, embed.FS, plugin entries). Designed for agent
+- **`skillkit.Catalog`** — multi-skill discovery across tiered sources
+  (filesystem directories, `embed.FS`, plugin entries). Designed for agent
   CLIs that load many skills and inject summaries into a system prompt.
 
 Both APIs share the same frontmatter primitives (`StripFrontmatter`,
@@ -34,15 +38,14 @@ frontmatter parsers between them. Each drifted from the others over time
 
 The Agent Skills open standard published in late 2025 turned this from a
 duplication problem into a portability problem: a skill written for one
-agent should work in any other without modification. This package
-implements the spec strictly so that skills authored against
-`agentskills-go` run unchanged in Cursor, Claude Code, Junie, and the
-rest of the ecosystem.
+agent should work in any other without modification. `skillkit` implements
+the spec strictly so that skills authored against it run unchanged in
+Cursor, Claude Code, Junie, and the rest of the ecosystem.
 
 ## Install
 
 ```bash
-go get github.com/anatolykoptev/agentskills-go
+go get github.com/anatolykoptev/skillkit
 ```
 
 Requires Go 1.26+. Zero non-stdlib runtime dependencies.
@@ -54,13 +57,14 @@ package myservice
 
 import (
     _ "embed"
-    skill "github.com/anatolykoptev/agentskills-go"
+
+    "github.com/anatolykoptev/skillkit"
 )
 
 //go:embed skills/answer-extractor/SKILL.md
 var rawSkill string
 
-var answerExtractor = skill.NewEmbedded(
+var answerExtractor = skillkit.NewEmbedded(
     "answer-extractor",
     "MYSERVICE_SKILL_PATH", // env override path for hot-reload (optional)
     rawSkill,
@@ -76,30 +80,63 @@ func systemPrompt() string {
 ```go
 package mycli
 
-import (
-    skill "github.com/anatolykoptev/agentskills-go"
-)
+import "github.com/anatolykoptev/skillkit"
 
-func newCatalog(workspaceDir, builtinDir string) *skill.Catalog {
-    return skill.NewCatalog(
-        skill.NewDirTier("workspace", workspaceDir),
-        skill.NewDirTier("builtin",   builtinDir),
+func newCatalog(workspaceDir, builtinDir string) *skillkit.Catalog {
+    return skillkit.NewCatalog(
+        skillkit.NewDirTier("workspace", workspaceDir),
+        skillkit.NewDirTier("builtin",   builtinDir),
     )
 }
 
-func loadDocReview(c *skill.Catalog) (string, bool) {
+func loadDocReview(c *skillkit.Catalog) (string, bool) {
     body, _, ok := c.Load("doc-review")
     return body, ok
 }
 
-func systemPromptSummary(c *skill.Catalog) string {
-    return c.BuildSummary(skill.SummaryXML)
+func systemPromptSummary(c *skillkit.Catalog) string {
+    return c.BuildSummary(skillkit.SummaryXML)
 }
 ```
 
-## Status
+## Conformance
 
-Not yet released. See `docs/plans/2026-04-30-init.md` for the work plan.
+skillkit implements the [agentskills.io](https://agentskills.io) open standard.
+A skill authored for skillkit runs unchanged in any conformant agent — no
+modifications to `SKILL.md` files are needed when switching tools.
+
+Adopting tools include (partial list):
+
+- Claude Code (Anthropic)
+- Cursor
+- GitHub Copilot
+- JetBrains Junie
+- Gemini CLI (Google)
+- OpenAI Codex
+- Goose (Block)
+- OpenHands (All Hands AI)
+- Letta
+
+...and 35+ others. See the [agentskills.io](https://agentskills.io) ecosystem page for
+the full list.
+
+For the field-by-field spec mapping, see
+[`docs/ARCHITECTURE.md` — Spec conformance](docs/ARCHITECTURE.md#spec-conformance).
+
+## Migration
+
+If you have a hand-rolled skill loader, replacing it with skillkit is a
+mechanical change. Existing `SKILL.md` files work unchanged.
+
+| Source pattern | skillkit equivalent | LoC reduction |
+|---|---|---|
+| Hand-rolled `//go:embed` + env override + mtime cache | `skillkit.NewEmbedded(name, envVar, raw)` | ~150 → 3 |
+| Hand-rolled tiered FS loader (workspace + builtin) | `skillkit.NewCatalog(NewDirTier(...), NewDirTier(...))` | ~200 → 5 |
+| Hand-rolled plugin-aware loader | `Catalog` + `NewPluginTier(name, entries)` | ~250 → 8 |
+
+See [`doc/skill.md` — Migration notes](doc/skill.md#11-migration-notes-from-hand-rolled-loaders)
+for annotated before/after examples. Per-repo projected deltas are in
+[`docs/plans/2026-04-30-init.md`](docs/plans/2026-04-30-init.md).
 
 ## License
 
