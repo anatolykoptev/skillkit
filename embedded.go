@@ -18,6 +18,11 @@ type EmbeddedOption func(*Embedded)
 // WithObserver attaches an Observer to the Embedded. Subsequent Body()
 // and Diagnostic() calls fire the observer's hooks. Nil observer is a
 // no-op (same as not calling WithObserver).
+//
+// Thread-safety: configure once at NewEmbedded construction; this option
+// is not safe to apply after concurrent Body()/Diagnostic() callers
+// have started. The observer field is read on every Body() without
+// synchronization (intentional — zero hot-path cost).
 func WithObserver(obs *Observer) EmbeddedOption {
 	return func(e *Embedded) {
 		e.observer = obs

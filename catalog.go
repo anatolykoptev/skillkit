@@ -29,6 +29,13 @@ func NewCatalog(tiers ...Tier) *Catalog {
 // (e.g. empty DirTier) still fire with count=0.
 //
 // Nil observer is a no-op; method returns the receiver unchanged.
+//
+// Thread-safety: configure once at startup before any concurrent
+// Load/LoadCtx callers — this method is not safe to call after the
+// catalog is in use. The observer field is read on every Load without
+// synchronization (intentional — zero hot-path cost). Future v0.3.0
+// may wrap observer in atomic.Pointer if a runtime swap use case
+// emerges.
 func (c *Catalog) WithObserver(obs *Observer) *Catalog {
 	if obs == nil {
 		return c

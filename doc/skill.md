@@ -474,23 +474,32 @@ var cat = skillkit.NewCatalog(
 
 ```go
 import (
+    "context"
+
+    "go.opentelemetry.io/otel/attribute"
     "go.opentelemetry.io/otel/metric"
+
     "github.com/anatolykoptev/skillkit"
 )
 
-func newSkillObserver(meter metric.Meter) *skillkit.Observer {
+// newSkillObserver builds an Observer that emits OTel counters. Caller
+// supplies the context used for every emission (typically a
+// long-lived process context such as context.Background()).
+func newSkillObserver(ctx context.Context, meter metric.Meter) *skillkit.Observer {
     calls, _ := meter.Int64Counter("skill.body.calls")
     fallbacks, _ := meter.Int64Counter("skill.env.fallbacks")
     return &skillkit.Observer{
-        BodyCall:    func(name, source string) {
-            calls.Add(ctx, 1,
-                metric.WithAttributes(attribute.String("name", name),
-                    attribute.String("source", source)))
+        BodyCall: func(name, source string) {
+            calls.Add(ctx, 1, metric.WithAttributes(
+                attribute.String("name", name),
+                attribute.String("source", source),
+            ))
         },
         EnvFallback: func(name, reason string) {
-            fallbacks.Add(ctx, 1,
-                metric.WithAttributes(attribute.String("name", name),
-                    attribute.String("reason", reason)))
+            fallbacks.Add(ctx, 1, metric.WithAttributes(
+                attribute.String("name", name),
+                attribute.String("reason", reason),
+            ))
         },
     }
 }
