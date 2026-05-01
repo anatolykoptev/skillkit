@@ -96,10 +96,36 @@ Resolution order per `Load(name)`:
 Fully backward compatible: every v0.2.0 caller compiles and behaves
 identically without modification.
 
-## v0.2.2 — Deferred hardening items
+## v0.2.2 — Tracer hook for span instrumentation (shipped)
 
-The items below were originally listed as v0.2.0/v0.2.1 candidates.
-Single-feature-release rule applied.
+Single-feature release per the senior-judgment default rule.
+
+| Task | Component | Status |
+|------|-----------|--------|
+| Tracer hook | `tracer.go` + `embedded.go` + `catalog.go` — opt-in span instrumentation | **shipped** |
+
+### What shipped
+
+- `Tracer` struct with hooks: `StartBody`, `StartCatalogLoad`. All
+  fields optional; nil = no-op. Vendor-neutral; stdlib-only core.
+- `WithTracer(*Tracer) EmbeddedOption` — attach at `NewEmbedded`.
+- `(*Embedded).BodyCtx(ctx context.Context) string` — context-aware
+  Body variant; opens a span via `Tracer.StartBody` when tracer is set.
+  Falls back to `Body()` when tracer is nil.
+- `(*Catalog).WithTracer(*Tracer) *Catalog` — chainable method mirroring
+  `WithObserver`. Nil tracer is no-op.
+- `Catalog.LoadCtx` wired to open a span via `Tracer.StartCatalogLoad`
+  when tracer is set. Outcome label ("hit"/"miss") attached at span end.
+- `Embedded.Body()` behavior unchanged. `Catalog.Load()` untouched
+  (no ctx, cannot trace).
+
+### Design rationale
+
+Same nil-able function-field approach as `Observer`. New fields are
+non-breaking; removal is reserved for v2.0.0. Callers adapt to
+OpenTelemetry or any other tracer with a 5-line wrapper function.
+
+### Deferred hardening items (originally planned for v0.2.2)
 
 - **Skill validation CLI** — small `cmd/skillvalidate` binary mirroring
   the conformance checks of `agentskills/skills-ref`. Useful for CI

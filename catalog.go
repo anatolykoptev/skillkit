@@ -13,6 +13,7 @@ import (
 type Catalog struct {
 	tiers    []Tier
 	observer *Observer
+	tracer   *Tracer
 	locale   string // BCP-47 language tag; "" = no locale filter
 }
 
@@ -49,6 +50,19 @@ func (c *Catalog) WithObserver(obs *Observer) *Catalog {
 			obs.CatalogSize(t.Name, count)
 		}
 	}
+	return c
+}
+
+// WithTracer returns the catalog wrapped with the given tracer.
+// Subsequent LoadCtx calls open a span via Tracer.StartCatalogLoad.
+// Nil tracer is a no-op (returns receiver unchanged).
+//
+// Thread-safety: same configure-once contract as WithObserver.
+func (c *Catalog) WithTracer(tr *Tracer) *Catalog {
+	if tr == nil {
+		return c
+	}
+	c.tracer = tr
 	return c
 }
 
@@ -153,7 +167,18 @@ func (c *Catalog) Load(name string) (body string, info SkillInfo, ok bool) {
 // When a locale is configured (via WithLocale), locale routing applies
 // to non-ContextResolver tiers; ContextResolver tiers still use FindCtx
 // (locale filtering is best-effort for network-backed sources).
+//
+// When a Tracer is configured via WithTracer, opens a span via
+// Tracer.StartCatalogLoad for the duration of the call. The outcome
+// label ("hit" or "miss") is attached when the span ends.
 func (c *Catalog) LoadCtx(ctx context.Context, name string) (body string, info SkillInfo, ok bool, err error) {
+	var outcome string
+	if c.tracer != nil && c.tracer.StartCatalogLoad != nil {
+		var end func(string)
+		ctx, end = c.tracer.StartCatalogLoad(ctx, name)
+		defer func() { end(outcome) }()
+	}
+
 	for _, t := range c.tiers {
 		if cr, isCtx := t.Resolver.(ContextResolver); isCtx {
 			si, b, found, findErr := cr.FindCtx(ctx, name)
@@ -164,6 +189,7 @@ func (c *Catalog) LoadCtx(ctx context.Context, name string) (body string, info S
 				continue
 			}
 			si = c.tagSource(t, si)
+			outcome = "hit"
 			c.fireCatalogLoad(name, "hit")
 			return b, si, true, nil
 		}
@@ -179,9 +205,11 @@ func (c *Catalog) LoadCtx(ctx context.Context, name string) (body string, info S
 			continue
 		}
 		si = c.tagSource(t, si)
+		outcome = "hit"
 		c.fireCatalogLoad(name, "hit")
 		return b, si, true, nil
 	}
+	outcome = "miss"
 	c.fireCatalogLoad(name, "miss")
 	return "", SkillInfo{}, false, nil
 }
