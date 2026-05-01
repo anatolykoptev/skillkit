@@ -63,15 +63,44 @@ means:
 
 See `doc/skill.md § 11. Observability` for wiring examples.
 
-## v0.2.1 — Deferred hardening items
+## v0.2.1 — Locale routing (shipped)
 
-The items below were originally listed as v0.2.0 candidates but are
-deferred until observability is validated in production (MemDB consumer
-adoption). Single-feature-release rule applied.
+Single-feature release per the senior-judgment default rule. Picked because
+MemDB has 3 orphaned locale variants (`d10-extractor.md` / `.ru.md` / `.zh.md`)
+that v0.2.0 could not route.
 
-- **Locale routing** — promote `Locale` from a metadata field to a
-  first-class `Catalog.WithLocale(locale)` filter. Lift from internal
-  practice once at least 2 consumers want it.
+| Task | Component | Status |
+|------|-----------|--------|
+| Locale routing | `catalog.go` + `locale.go` + `tier_dir.go` + `tier_embed.go` + `tier_plugin.go` | **shipped** |
+
+### What shipped
+
+- `(*Catalog).WithLocale(locale string) *Catalog` — chained method. Sets a
+  locale preference for subsequent `Load`/`LoadCtx` calls. Empty string is
+  no-op. Mirrors `WithObserver` UX.
+- `(*Catalog).Locale() string` — getter for the configured locale.
+- Unexported `bodyByInfoResolver` interface implemented by `DirTier`,
+  `EmbedFSTier`, and `PluginTier`. Custom `Resolver` implementations without
+  the interface still work — locale routing degrades to best-effort.
+- `findInTierByLocale` private helper: walks a tier collecting name-matching
+  skills, then selects best per: exact locale > neutral (empty) > any match.
+
+Resolution order per `Load(name)`:
+1. Walk tiers in priority order.
+2. Within each tier, prefer `Metadata.Locale` matching the configured locale
+   (case-insensitive).
+3. Fall back to `Metadata.Locale == ""` (locale-neutral).
+4. Fall back to first name match (any locale).
+5. Miss in all tiers → `ok=false` (existing behavior).
+
+Fully backward compatible: every v0.2.0 caller compiles and behaves
+identically without modification.
+
+## v0.2.2 — Deferred hardening items
+
+The items below were originally listed as v0.2.0/v0.2.1 candidates.
+Single-feature-release rule applied.
+
 - **Skill validation CLI** — small `cmd/skillvalidate` binary mirroring
   the conformance checks of `agentskills/skills-ref`. Useful for CI
   integration in consumer repos.

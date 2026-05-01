@@ -20,6 +20,10 @@
 // backend (prometheus, OpenTelemetry, slog, ...). All hooks are
 // nil-safe; skillkit core stays stdlib-only. See WithObserver.
 //
+// Locale routing: Catalog supports opt-in locale preference via
+// WithLocale, enabling multi-language skill catalogs without changing
+// existing skill names. See Catalog.WithLocale (v0.2.1+).
+//
 // Spec conformance: skillkit implements the agentskills.io standard
 // adopted by Claude Code, Cursor, GitHub Copilot, JetBrains Junie,
 // Gemini CLI, OpenAI Codex, and 35+ other agentic tools. A skill

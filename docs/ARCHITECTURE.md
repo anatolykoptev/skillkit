@@ -114,6 +114,16 @@ detects implementation via type assertion and prefers `FindCtx`
 when available. This keeps existing in-process callers untouched
 while leaving the door open for v0.3.0 network resolvers.
 
+### Locale routing (v0.2.1)
+
+`Catalog.WithLocale(locale)` adds an opt-in locale preference layer on top of
+the existing tier resolution chain. Within each tier, skills are ranked:
+exact-locale match > locale-neutral (`Metadata.Locale == ""`) > any name
+match. Tier priority is unaffected: a tier1 neutral variant wins over a tier2
+exact-locale match. Custom `Resolver` implementations without the unexported
+`bodyByInfoResolver` interface degrade gracefully to best-effort (first
+`Find(name)` result).
+
 ### Observability
 
 Both patterns accept an optional `Observer` struct that fires nil-safe
@@ -250,7 +260,7 @@ skillkit custom fields (widely useful, not in spec):
 | Field | Purpose |
 |-------|---------|
 | `version` | semver string for migration tracking |
-| `locale` | language tag (en/ru/zh); routing is consumer concern in v0.1 |
+| `locale` | language tag (en/ru/zh); first-class routing via `Catalog.WithLocale` (v0.2.1+) |
 | `tags` | flow list or comma-separated for categorization |
 
 ## Module layout choice

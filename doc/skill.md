@@ -589,7 +589,90 @@ summary := cat.BuildSummary(skillkit.SummaryXML)
 
 ---
 
-## 13. Spec conformance table
+## 13. Locale routing (v0.2.1+)
+
+### Frontmatter field
+
+The agentskills.io spec includes an optional `locale` field for language-tagged
+skill variants:
+
+```markdown
+---
+name: d10-extractor
+description: Extracts the ten most important atomic facts from a document.
+locale: ru
+---
+
+# D10 Экстрактор
+
+...
+```
+
+Common values follow BCP-47 language tags (`en`, `ru`, `zh`, `pt-BR`), but
+skillkit does not validate the format — the caller decides the vocabulary.
+
+### Directory layout for locale variants
+
+Each locale variant is its own skill directory with the same frontmatter `name`
+but a different subdirectory name (to avoid collision):
+
+```
+skills/
+  d10-extractor/           ← locale-neutral (no `locale:` field)
+    SKILL.md
+  d10-extractor-ru/        ← Russian variant
+    SKILL.md               ← frontmatter: name: d10-extractor, locale: ru
+  d10-extractor-zh/        ← Chinese variant
+    SKILL.md               ← frontmatter: name: d10-extractor, locale: zh
+```
+
+`DirTier` uses the subdirectory name as `SkillInfo.Name` and the frontmatter
+`name:` field as `Metadata.Name`. Locale routing matches on `Metadata.Name` first,
+enabling `cat.Load("d10-extractor")` to find all three variants.
+
+### Per-request locale selection
+
+```go
+func handleRequest(req *http.Request, cat *skillkit.Catalog) string {
+    // Detect locale from request (Accept-Language, user preference, etc.).
+    locale := detectLocale(req) // e.g. "ru", "zh", "en"
+
+    // WithLocale mutates and returns the same *Catalog — no allocation.
+    // Configure once at startup or clone per-request as needed.
+    body, _, ok := cat.WithLocale(locale).Load("d10-extractor")
+    if !ok {
+        return ""
+    }
+    return body
+}
+```
+
+**Note:** Per-request `Catalog` construction is cheap — no I/O. skillkit does
+not detect request locale; the caller passes the locale string to `WithLocale`.
+
+### Resolution chain
+
+Within each tier, `Load` selects the best variant in this order:
+
+1. `Metadata.Locale` equals the configured locale (case-insensitive).
+2. `Metadata.Locale == ""` (locale-neutral fallback).
+3. Any `Metadata.Name` match (first found — when no neutral variant exists).
+4. Miss in this tier → next tier (tier priority is unaffected by locale).
+5. No match in any tier → `ok=false` (existing miss behavior).
+
+Tier priority always wins over locale preference: if tier1 has a neutral
+variant and tier2 has an exact locale match, tier1's neutral is returned.
+
+### Getter
+
+```go
+cat := skillkit.NewCatalog(...).WithLocale("ru")
+fmt.Println(cat.Locale()) // "ru"
+```
+
+---
+
+## 14. Spec conformance table
 
 | Spec field | Required? | skillkit slot |
 |---|---|---|
