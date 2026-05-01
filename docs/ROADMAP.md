@@ -2,7 +2,7 @@
 
 Status as of 2026-04-30.
 
-## v0.1.0 — Initial release (in progress)
+## v0.1.0 — Initial release (shipped)
 
 The reference Go implementation of the [agentskills.io open
 standard](https://agentskills.io). Public API surface targets full
@@ -10,29 +10,68 @@ conformance with the spec plus Claude Code extensions.
 
 | Task | Component | Status |
 |------|-----------|--------|
-| A | `frontmatter.go` + `metadata.go` — YAML/JSON frontmatter + typed Metadata + `ValidateName` | planned |
-| B | `embedded.go` — single-skill loader with `//go:embed` + env-override + mtime cache (Pattern A) | planned |
-| C | `tier.go` — `Resolver`/`ContextResolver`/`DirTier`/`EmbedFSTier`/`PluginTier` | planned |
-| D | `catalog.go` + `summary.go` — multi-tier catalog with XML/Markdown/JSON summaries (Pattern B) | planned |
-| E | `bootstrap.go` — `InitWorkspace` first-run defaults | planned |
-| F | `doc.go` + `doc/skill.md` + README polish | planned |
-| - | Final code-quality review | planned |
+| A | `frontmatter.go` + `metadata.go` — YAML/JSON frontmatter + typed Metadata + `ValidateName` | shipped |
+| B | `embedded.go` — single-skill loader with `//go:embed` + env-override + mtime cache (Pattern A) | shipped |
+| C | `tier.go` — `Resolver`/`ContextResolver`/`DirTier`/`EmbedFSTier`/`PluginTier` | shipped |
+| D | `catalog.go` + `summary.go` — multi-tier catalog with XML/Markdown/JSON summaries (Pattern B) | shipped |
+| E | `bootstrap.go` — `InitWorkspace` first-run defaults | shipped |
+| F | `doc.go` + `doc/skill.md` + README polish | shipped |
+| - | Final code-quality review | shipped |
 
 Acceptance: ≥90% line coverage, `go test -race` clean,
 `golangci-lint v2` clean, `go vet` clean, stdlib-only deps.
 
 Implementation plan: [`plans/2026-04-30-init.md`](plans/2026-04-30-init.md).
 
-## v0.2.0 — Real-world hardening
+## v0.2.0 — Observability (shipped)
 
-After v0.1.0 ships, gather migration feedback from the consumer repos
-before locking the public API. Likely additions:
+Single-feature release per the senior-judgment default rule: land one
+well-scoped addition, validate it in production via MemDB consumer
+adoption, then continue with remaining hardening items.
+
+| Task | Component | Status |
+|------|-----------|--------|
+| Observer hooks | `observer.go` + `embedded.go` + `catalog.go` — vendor-neutral `Observer` struct with nil-able func fields | **shipped** |
+
+### What shipped
+
+- `Observer` struct with hooks: `BodyCall`, `EnvFallback`, `BodyBytes`,
+  `CatalogLoad`, `CatalogSize`. All fields optional; nil = no-op.
+- `WithObserver(*Observer) EmbeddedOption` — attach at `NewEmbedded`.
+- `NewEmbedded(name, envVar, raw, opts ...EmbeddedOption)` — variadic;
+  existing 3-arg call sites unchanged (backward compatible).
+- `(*Catalog).WithObserver(*Observer) *Catalog` — chained method; fires
+  `CatalogSize` once per tier on first attach.
+- All resolution paths in `Embedded.Body()` instrumented: embedded
+  fast-path, env-success, cache-hit, last-known-good (stat failure +
+  ReadFile failure), three env-fallback reasons.
+- `Catalog.Load` / `LoadCtx` instrumented with hit/miss outcome.
+- `LoadMany` / `LoadManyCtx` intentionally NOT instrumented — they are
+  batch wrappers; the per-name `Load` call is the right granularity.
+
+### Design rationale
+
+Observer fields are nil-able function values, not an interface. This
+means:
+
+1. Adding a new field in a future release is non-breaking — existing
+   callers' `Observer` literals compile unchanged (new field defaults
+   to nil = no-op).
+2. Removing a field is a breaking change reserved for v2.0.0.
+3. No prometheus / otel transitive dep in skillkit core; consumers wire
+   to whichever backend they already have.
+
+See `doc/skill.md § 11. Observability` for wiring examples.
+
+## v0.2.1 — Deferred hardening items
+
+The items below were originally listed as v0.2.0 candidates but are
+deferred until observability is validated in production (MemDB consumer
+adoption). Single-feature-release rule applied.
 
 - **Locale routing** — promote `Locale` from a metadata field to a
-  first-class `Catalog.WithLocale(locale)` filter. Currently
-  out-of-scope; only consumer pattern is MemDB's stale `.ru.md`/`.zh.md`
-  files which the loader doesn't yet route. Lift from internal practice
-  once at least 2 consumers want it.
+  first-class `Catalog.WithLocale(locale)` filter. Lift from internal
+  practice once at least 2 consumers want it.
 - **Skill validation CLI** — small `cmd/skillvalidate` binary mirroring
   the conformance checks of `agentskills/skills-ref`. Useful for CI
   integration in consumer repos.
