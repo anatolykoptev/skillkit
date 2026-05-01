@@ -1,13 +1,16 @@
 # skillkit
 
+<!-- [![Go Reference](https://pkg.go.dev/badge/github.com/anatolykoptev/skillkit.svg)](https://pkg.go.dev/github.com/anatolykoptev/skillkit) -->
+<!-- [![CI](https://github.com/anatolykoptev/skillkit/actions/workflows/ci.yml/badge.svg)](https://github.com/anatolykoptev/skillkit/actions/workflows/ci.yml) -->
+
 > The reference Go toolkit for the [agentskills.io open standard](https://agentskills.io).
 > Parse `SKILL.md` files, validate names, discover skills from filesystem
 > or `embed.FS`, integrate with Claude Code, Cursor, GitHub Copilot,
 > JetBrains Junie, Gemini CLI, OpenAI Codex, and 35+ other agentic tools
 > without lock-in.
 
-> **Status:** in development. First reference Go implementation of the
-> agentskills.io standard. See `docs/plans/` for the work plan.
+> **Status:** pre-1.0, public API may change. v0.1.0 release pending final review.
+> See `docs/plans/` for the work plan.
 
 ## What it does
 
@@ -96,9 +99,44 @@ func systemPromptSummary(c *skillkit.Catalog) string {
 }
 ```
 
-## Status
+## Conformance
 
-Not yet released. See `docs/plans/2026-04-30-init.md` for the work plan.
+skillkit implements the [agentskills.io](https://agentskills.io) open standard.
+A skill authored for skillkit runs unchanged in any conformant agent — no
+modifications to `SKILL.md` files are needed when switching tools.
+
+Adopting tools include (partial list):
+
+- Claude Code (Anthropic)
+- Cursor
+- GitHub Copilot
+- JetBrains Junie
+- Gemini CLI (Google)
+- OpenAI Codex
+- Goose (Block)
+- OpenHands (All Hands AI)
+- Letta
+
+...and 35+ others. See the [agentskills.io](https://agentskills.io) ecosystem page for
+the full list.
+
+For the field-by-field spec mapping, see
+[`docs/ARCHITECTURE.md` — Spec conformance](docs/ARCHITECTURE.md#spec-conformance).
+
+## Migration
+
+If you have a hand-rolled skill loader, replacing it with skillkit is a
+mechanical change. Existing `SKILL.md` files work unchanged.
+
+| Source pattern | skillkit equivalent | LoC reduction |
+|---|---|---|
+| Hand-rolled `//go:embed` + env override + mtime cache | `skillkit.NewEmbedded(name, envVar, raw)` | ~150 → 3 |
+| Hand-rolled tiered FS loader (workspace + builtin) | `skillkit.NewCatalog(NewDirTier(...), NewDirTier(...))` | ~200 → 5 |
+| Hand-rolled plugin-aware loader | `Catalog` + `NewPluginTier(name, entries)` | ~250 → 8 |
+
+See [`doc/skill.md` — Migration notes](doc/skill.md#11-migration-notes-from-hand-rolled-loaders)
+for annotated before/after examples. Per-repo projected deltas are in
+[`docs/plans/2026-04-30-init.md`](docs/plans/2026-04-30-init.md).
 
 ## License
 
