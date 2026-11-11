@@ -104,7 +104,7 @@ cover all known consumer patterns:
 
 | Resolver | Source | Use case |
 |----------|--------|----------|
-| `DirTier` | filesystem `<dir>/<skill>/SKILL.md` | dozor workspace + builtin, vaelor multi-tier, go-hully, go-wp |
+| `DirTier` | filesystem `<dir>/<skill>/SKILL.md` | dozor workspace + builtin, vaelor multi-tier, a content-site service, go-wp |
 | `EmbedFSTier` | `embed.FS` rooted at `<root>/<skill>/SKILL.md` | binaries shipping a fixed multi-skill catalog |
 | `PluginTier` | `[]PluginEntry` with namespacing | vaelor plugin sources |
 
