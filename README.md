@@ -10,7 +10,7 @@
 > without lock-in.
 
 > **Status:** pre-1.0, public API may change. v0.1.0 release pending final review.
-> See `docs/plans/` for the work plan.
+> See `docs/ROADMAP.md` for the work plan.
 
 ## What it does
 
@@ -141,8 +141,7 @@ mechanical change. Existing `SKILL.md` files work unchanged.
 | Hand-rolled plugin-aware loader | `Catalog` + `NewPluginTier(name, entries)` | ~250 → 8 |
 
 See [`doc/skill.md` — Migration notes](doc/skill.md#11-migration-notes-from-hand-rolled-loaders)
-for annotated before/after examples. Per-repo projected deltas are in
-[`docs/plans/2026-04-30-init.md`](docs/plans/2026-04-30-init.md).
+for annotated before/after examples.
 
 ## License
 

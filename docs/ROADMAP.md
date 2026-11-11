@@ -21,8 +21,6 @@ conformance with the spec plus Claude Code extensions.
 Acceptance: ≥90% line coverage, `go test -race` clean,
 `golangci-lint v2` clean, `go vet` clean, stdlib-only deps.
 
-Implementation plan: [`plans/2026-04-30-init.md`](plans/2026-04-30-init.md).
-
 ## v0.2.0 — Observability (shipped)
 
 Single-feature release per the senior-judgment default rule: land one
@@ -195,5 +193,5 @@ Stability guarantees at v1.0.0:
 
 ## Tracking
 
-Plans for each release live in [`plans/`](plans/). Each plan is a
+Plans for each release are kept outside this repository. Each plan is a
 self-contained spec for one release scope.
