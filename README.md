@@ -1,5 +1,14 @@
 # skillkit
 
+> **This repository is archived. skillkit now lives in go-kit as the package
+> [`github.com/anatolykoptev/go-kit/skills`](https://github.com/anatolykoptev/go-kit/tree/main/skills)**
+> (guide: [doc/skills.md](https://github.com/anatolykoptev/go-kit/blob/main/doc/skills.md)).
+> The exported API is identical — migrate by changing the import path to
+> `github.com/anatolykoptev/go-kit/skills` and the package qualifier from `skillkit.` to `skills.`.
+> The go-kit version also fixes eight defects present here, including a path-traversal
+> in `DirTier.Find` when skill names come from untrusted input. Importing that one
+> package pulls only its own (standard-library) dependencies.
+
 <!-- [![Go Reference](https://pkg.go.dev/badge/github.com/anatolykoptev/skillkit.svg)](https://pkg.go.dev/github.com/anatolykoptev/skillkit) -->
 <!-- [![CI](https://github.com/anatolykoptev/skillkit/actions/workflows/ci.yml/badge.svg)](https://github.com/anatolykoptev/skillkit/actions/workflows/ci.yml) -->
 
